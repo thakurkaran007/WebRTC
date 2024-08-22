@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export const Sender = () => {
     const [socket, setSocket] = useState<WebSocket | null>(null);
+    //@ts-ignore
     const [pc, setPC] = useState<RTCPeerConnection | null>(null);
+    const videoref = useRef<HTMLVideoElement>(null);
 
     useEffect(() => {
         const socket = new WebSocket('ws://localhost:8080');
@@ -29,7 +31,6 @@ export const Sender = () => {
                     type: 'iceCandidate',
                     candidate: event.candidate
                 }));
-                console.log("Sending candidate");
             }
         };
 
@@ -40,7 +41,6 @@ export const Sender = () => {
                 type: 'createOffer',
                 sdp: pc.localDescription
             }));
-            console.log('Sender offer');
         };
 
         socket.onmessage = async (event) => {
@@ -48,26 +48,25 @@ export const Sender = () => {
             if (message.type === 'createAnswer') {
                 await pc.setRemoteDescription(message.sdp);
             } else if (message.type === 'iceCandidate') {
-                console.log('added ice by calling of receiver');
                 pc.addIceCandidate(message.candidate);
             }
         };
+
         navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
-            const video = document.createElement('video');
-            video.srcObject = stream;
-            video.muted = true; // Mute if necessary
-            video.play().catch((error) => console.log("Play failed: ", error));
-            document.body.appendChild(video);
+            if(videoref.current) {
+                videoref.current.srcObject = stream;
+            }
             stream.getTracks().forEach((track) => {
-                pc?.addTrack(track);
+                console.log('Sender track:', track);
+                pc?.addTrack(track, stream);
             });
         });
     };
 
-
     return (
         <div>
             Sender
+            <video ref={videoref} muted autoPlay></video>
             <button onClick={MakeConnection}>Send data</button>
         </div>
     );
